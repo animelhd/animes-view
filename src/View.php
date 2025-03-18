@@ -50,7 +50,7 @@ class View extends Model
 
     public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
-        return $this->belongsTo(\config('auth.providers.users.model'), \config('animesview.user_foreign_key'));
+        return $this->belongsTo(\config('animesview.viewer_model'), \config('animesview.user_foreign_key'));
     }
 
     public function viewer(): \Illuminate\Database\Eloquent\Relations\BelongsTo

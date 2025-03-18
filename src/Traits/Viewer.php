@@ -2,20 +2,22 @@
 
 namespace Animelhd\AnimesView\Traits;
 
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Pagination\AbstractCursorPaginator;
+use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\LazyCollection;
 
 /**
  * @property \Illuminate\Database\Eloquent\Collection $views
  */
 trait Viewer
 {
-    public function view(Model $object)
+    public function view(Model $object): void
     {
         /* @var \Animelhd\AnimesView\Traits\Vieweable $object */
-        if (!$this->hasViewed($object)) {
+        if (! $this->hasViewed($object)) {
             $view = app(config('animesview.view_model'));
             $view->{config('animesview.user_foreign_key')} = $this->getKey();
 
@@ -23,7 +25,7 @@ trait Viewer
         }
     }
 
-    public function unview(Model $object)
+    public function unview(Model $object): void
     {
         /* @var \Animelhd\AnimesView\Traits\Vieweable $object */
         $relation = $object->views()
@@ -37,7 +39,7 @@ trait Viewer
         }
     }
 
-    public function toggleView(Model $object)
+    public function toggleView(Model $object): void
     {
         $this->hasViewed($object) ? $this->unview($object) : $this->view($object);
     }
@@ -55,52 +57,44 @@ trait Viewer
         return $this->hasMany(config('animesview.view_model'), config('animesview.user_foreign_key'), $this->getKeyName());
     }
 
-    public function attachViewStatus($vieweables, callable $resolver = null)
+    public function attachViewStatus(&$vieweables, ?callable $resolver)
     {
-        $returnFirst = false;
-        $toArray = false;
-
-        switch (true) {
-            case $vieweables instanceof Model:
-                $returnFirst = true;
-                $vieweables = \collect([$vieweables]);
-                break;
-            case $vieweables instanceof LengthAwarePaginator:
-                $vieweables = $vieweables->getCollection();
-                break;
-            case $vieweables instanceof Paginator:
-                $vieweables = \collect($vieweables->items());
-                break;
-            case \is_array($vieweables):
-                $vieweables = \collect($vieweables);
-                $toArray = true;
-                break;
-        }
-
-        \abort_if(!($vieweables instanceof Collection), 422, 'Invalid $vieweables type.');
-
-        $viewed = $this->views()->get()->keyBy(function ($item) {
+        $views = $this->views()->get()->keyBy(function ($item) {
             return \sprintf('%s-%s', $item->vieweable_type, $item->vieweable_id);
         });
 
-        $vieweables->map(function ($vieweable) use ($viewed, $resolver) {
+        $attachStatus = function ($vieweable) use ($views, $resolver) {
             $resolver = $resolver ?? fn ($m) => $m;
             $vieweable = $resolver($vieweable);
 
-            if ($vieweable && \in_array(Vieweable::class, \class_uses($vieweable))) {
+            if (\in_array(Vieweable::class, \class_uses($vieweable))) {
                 $key = \sprintf('%s-%s', $vieweable->getMorphClass(), $vieweable->getKey());
-                $vieweable->setAttribute('has_viewed', $viewed->has($key));
+                $vieweable->setAttribute('has_viewed', $views->has($key));
             }
-        });
 
-        return $returnFirst ? $vieweables->first() : ($toArray ? $vieweables->all() : $vieweables);
+            return $vieweable;
+        };
+
+        switch (true) {
+            case $vieweables instanceof Model:
+                return $attachStatus($vieweables);
+            case $vieweables instanceof Collection:
+                return $vieweables->each($attachStatus);
+            case $vieweables instanceof LazyCollection:
+                return $vieweables = $vieweables->map($attachStatus);
+            case $vieweables instanceof AbstractPaginator:
+            case $vieweables instanceof AbstractCursorPaginator:
+                return $vieweables->through($attachStatus);
+            case $vieweables instanceof Paginator:
+                // custom paginator will return a collection
+                return collect($vieweables->items())->transform($attachStatus);
+            case \is_array($vieweables):
+                return \collect($vieweables)->transform($attachStatus);
+            default:
+                throw new \InvalidArgumentException('Invalid argument type.');
+        }
     }
 
-    /**
-     * Get Query Builder for views
-     *
-     * @return Illuminate\Database\Eloquent\Builder
-     */
     public function getViewItems(string $model)
     {
         return app($model)->whereHas(

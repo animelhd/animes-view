@@ -19,5 +19,10 @@ return [
     /*
      * Model name for view record.
      */
-    'view_model' => 'Animelhd\AnimesView\View',
+    'view_model' => Animelhd\AnimesView\View::class,
+
+     /*
+     * Model name for viewr model.
+     */
+    'viewer_model' => App\Models\User::class,
 ];
