@@ -11,10 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create(config('animesfavorite.favorites_table'), function (Blueprint $table) {
+        Schema::create(config('animesview.views_table'), function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger(config('animesfavorite.user_foreign_key'))->index()->comment('user_id');
-            $table->morphs('favoriteable');
+            $table->unsignedBigInteger(config('animesview.user_foreign_key'))->index()->comment('user_id');
+            $table->morphs('vieweable');
             $table->timestamps();
         });
     }
@@ -24,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists(config('animesfavorite.favorites_table'));
+        Schema::dropIfExists(config('animesview.views_table'));
     }
 };

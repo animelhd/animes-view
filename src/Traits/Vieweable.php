@@ -18,7 +18,7 @@ trait Vieweable
         return $this->hasBeenViewedBy($user);
     }
 
-    public function hasFavoriter(Model $user): bool
+    public function hasViewer(Model $user): bool
     {
         return $this->hasBeenViewedBy($user);
     }
